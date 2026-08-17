@@ -1,22 +1,56 @@
-# CoinDemo
+# Codex Windows Installer Archive
 
-GitHub Actions workflow for archiving Codex installers.
+This repository archives the official Windows MSIX packages distributed for the
+Codex desktop app. A scheduled GitHub Actions workflow checks the x64 and Arm64
+packages each day and publishes new versions as GitHub Releases.
 
-The `Archive Codex Installers` workflow downloads the official x64 and Arm64
-MSIX packages daily at 12:00 Asia/Shanghai (04:00 UTC), records the package
-version and SHA-256 checksums, and stores them in GitHub artifact storage for
-30 days. It can also be started manually from the repository's **Actions** page,
-where the output directory and architecture can be selected.
+This is a community-maintained project. It is not affiliated with or endorsed by
+OpenAI.
 
-The core flow can run outside CI on any Bash environment with `curl`, `unzip`,
-and `sha256sum` installed:
+## Download
 
-在 Windows 本地下载时，请使用 Git Bash 运行下面的命令，不要直接使用
-PowerShell。单个安装包的下载超时时间为 30 分钟。
+Open the [Releases](https://github.com/NextSwift/CodexApp-Win-Bot/releases) page
+and download `codex-installers-{version}.zip`. Each archive contains:
+
+- Versioned x64 and Arm64 MSIX packages
+- `SHA256SUMS` for integrity checks
+- `manifest.tsv` with the package version and source URLs
+- `README.txt` with verification instructions
+
+Run this command inside the extracted archive to verify both packages:
+
+```bash
+sha256sum --check SHA256SUMS
+```
+
+## Archive workflow
+
+The `Archive Codex Installers` workflow runs daily at 12:00 Asia/Shanghai
+(04:00 UTC). It reads the version from each package's `AppxManifest.xml` and
+publishes `codex-installers-{version}.zip` under the
+`codex-win-v{version}` release tag.
+
+If a published release already exists for that version, the workflow skips the
+upload. If an upload leaves a draft release, the next run retries the bundle
+before publishing it. Manual single-architecture runs use architecture-specific
+release tags and asset names.
+
+You can also run the workflow from the repository's **Actions** page and select
+the target architecture.
+
+## Run locally
+
+The download script requires Bash, `curl`, `unzip`, and `sha256sum`:
 
 ```bash
 bash ./scripts/download-codex-installers.sh [output-directory] [x64|arm64 ...]
 ```
 
-Open the repository's **Actions** page, select **Archive Codex Installers**, then use
-**Run workflow** to select a ref and provide the workflow inputs.
+On Windows, run the command in Git Bash instead of PowerShell. Each package has
+a 30-minute download timeout.
+
+## License
+
+The automation code in this repository is licensed under the [MIT License](LICENSE).
+Downloaded installer packages remain subject to their respective terms and are
+not covered by this license.
