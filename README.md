@@ -9,8 +9,8 @@ OpenAI.
 
 ## Download
 
-Open the [Releases](https://github.com/NextSwift/CodexApp-Win-Bot/releases) page
-and download `codex-installers-{version}.zip`. Each archive contains:
+Open the [Releases](https://github.com/NextSwift/CodexApp-Win-Bot/releases) page.
+Each release provides these assets:
 
 - Versioned x64 and Arm64 MSIX packages
 - `SHA256SUMS` for integrity checks
@@ -27,11 +27,12 @@ sha256sum --check SHA256SUMS
 
 The `Archive Codex Installers` workflow runs daily at 12:00 Asia/Shanghai
 (04:00 UTC). It reads the version from each package's `AppxManifest.xml` and
-publishes `codex-installers-{version}.zip` under the
-`codex-win-v{version}` release tag.
+uploads the x64 and Arm64 MSIX packages as separate assets under the
+`codex-win-v{version}` release tag. The checksum, manifest, and verification
+instructions are published alongside the packages.
 
 If a published release already exists for that version, the workflow skips the
-upload. If an upload leaves a draft release, the next run retries the bundle
+upload. If an upload leaves a draft release, the next run retries the assets
 before publishing it. Manual single-architecture runs use architecture-specific
 release tags and asset names.
 

@@ -93,10 +93,8 @@ jobs:
           architecture="${ARCHITECTURES:-both}"
           if [[ "${architecture}" == "both" ]]; then
             release_stem="codex-win"
-            bundle_stem="codex-installers"
           else
             release_stem="codex-win-${architecture}"
-            bundle_stem="codex-installers-${architecture}"
           fi
           tag="${release_stem}-v${VERSION}"
           published=false
@@ -115,25 +113,9 @@ jobs:
 
           {
             echo "tag=${tag}"
-            echo "bundle_stem=${bundle_stem}"
             echo "published=${published}"
             echo "draft=${draft}"
           } >> "${GITHUB_OUTPUT}"
-
-      - name: Create versioned bundle
-        id: bundle
-        if: steps.release.outputs.published != 'true'
-        shell: bash
-        env:
-          ARCHIVE_DIR: ${{ inputs.output_dir }}
-          VERSION: ${{ steps.download.outputs.version }}
-          BUNDLE_STEM: ${{ steps.release.outputs.bundle_stem }}
-        run: |
-          set -euo pipefail
-          archive_dir="${ARCHIVE_DIR:-archive}"
-          bundle_path="${RUNNER_TEMP}/${BUNDLE_STEM}-${VERSION}.zip"
-          (cd "${archive_dir}" && zip -q -r "${bundle_path}" .)
-          echo "path=${bundle_path}" >> "${GITHUB_OUTPUT}"
 
       - name: Publish release
         if: steps.release.outputs.published != 'true'
@@ -142,17 +124,31 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.download.outputs.version }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
-          BUNDLE_PATH: ${{ steps.bundle.outputs.path }}
           RELEASE_IS_DRAFT: ${{ steps.release.outputs.draft }}
+          ARCHIVE_DIR: ${{ inputs.output_dir }}
         run: |
           set -euo pipefail
+          archive_dir="${ARCHIVE_DIR:-archive}"
+          assets=(
+            "${archive_dir}"/*.msix
+            "${archive_dir}/SHA256SUMS"
+            "${archive_dir}/manifest.tsv"
+            "${archive_dir}/README.txt"
+          )
+          for asset in "${assets[@]}"; do
+            [[ -f "${asset}" ]] || {
+              echo "Missing release asset: ${asset}" >&2
+              exit 1
+            }
+          done
+
           if [[ "${RELEASE_IS_DRAFT}" == "true" ]]; then
-            gh release upload "${RELEASE_TAG}" "${BUNDLE_PATH}" \
+            gh release upload "${RELEASE_TAG}" "${assets[@]}" \
               --repo "${GITHUB_REPOSITORY}" --clobber
             gh release edit "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" \
               --draft=false
           else
-            gh release create "${RELEASE_TAG}" "${BUNDLE_PATH}" \
+            gh release create "${RELEASE_TAG}" "${assets[@]}" \
               --repo "${GITHUB_REPOSITORY}" \
               --target "${GITHUB_SHA}" \
               --title "Codex Windows ${VERSION}" \
