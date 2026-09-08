@@ -8,11 +8,6 @@ if [[ ${#architectures[@]} -eq 0 ]]; then
   architectures=(x64 arm64)
 fi
 
-declare -A urls=(
-  [x64]="https://persistent.oaistatic.com/codex-app-prod/ChatGPT-x64.msix"
-  [arm64]="https://persistent.oaistatic.com/codex-app-prod/ChatGPT-arm64.msix"
-)
-
 for command in curl unzip sha256sum; do
   command -v "${command}" >/dev/null || {
     echo "Missing required command: ${command}" >&2
@@ -25,28 +20,45 @@ mkdir -p "${output_dir}"
 : > "${output_dir}/manifest.tsv"
 
 for arch in "${architectures[@]}"; do
-  [[ -n "${urls[$arch]:-}" ]] || {
-    echo "Unsupported architecture: ${arch} (use x64 or arm64)" >&2
-    exit 2
-  }
+  case "${arch}" in
+    x64|arm64)
+      url="https://persistent.oaistatic.com/codex-app-prod/ChatGPT-${arch}.msix"
+      ;;
+    *)
+      echo "Unsupported architecture: ${arch} (use x64 or arm64)" >&2
+      exit 2
+      ;;
+  esac
 
-  package="ChatGPT-${arch}.msix"
-  curl --fail --location --retry 3 --retry-delay 5 \
+  package="${output_dir}/.ChatGPT-${arch}.msix.download"
+  if ! curl --fail --location --retry 3 --retry-delay 5 \
     --connect-timeout 30 --max-time 1800 \
-    "${urls[$arch]}" --output "${package}"
+    "${url}" --output "${package}"; then
+    rm -f "${package}"
+    exit 1
+  fi
 
   version="$(unzip -p "${package}" AppxManifest.xml \
     | sed -n 's/.*Identity[^>]*Version="\([^"]*\)".*/\1/p' \
     | head -n 1)"
   [[ -n "${version}" ]] || {
     echo "Unable to read package version from ${package}" >&2
+    rm -f "${package}"
     exit 1
   }
+  if [[ ! "${version}" =~ ^[0-9]+(\.[0-9]+){3}$ ]]; then
+    echo "Invalid package version in ${package}: ${version}" >&2
+    rm -f "${package}"
+    exit 1
+  fi
 
   archived="ChatGPT-${arch}-${version}.msix"
   mv "${package}" "${output_dir}/${archived}"
-  sha256sum "${output_dir}/${archived}" >> "${output_dir}/SHA256SUMS"
-  printf '%s\t%s\t%s\n' "${arch}" "${version}" "${urls[$arch]}" \
+  (
+    cd "${output_dir}"
+    sha256sum "${archived}" >> SHA256SUMS
+  )
+  printf '%s\t%s\t%s\n' "${arch}" "${version}" "${url}" \
     >> "${output_dir}/manifest.tsv"
 done
 
